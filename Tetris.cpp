@@ -18,50 +18,81 @@ const float cornerX = diffX*5, cornerY = diffY*10;
 
 //----------------------------------------------------------------------------
 
-enum Rotation_mode { NONE, SEMI, FULL}
+enum Rotation_mode { NONE, SEMI, FULL};
 
 class Shape{
-    public:
-        Shape(vector<vec2> positions, vec2 center, Rotation_mode rmode)
-            : _pos(positions), _center(center), _rmode(rmode) {
-                for(vec2& v: _pos){
-                    v *= _SCALE;
-                }
-                _center *= _SCALE;
+public:
+    Shape(vector<vec2> positions, vec2 center, Rotation_mode rmode)
+        : _pos(positions), _center(center), _rmode(rmode) {
+            for(vec2& v: _pos){
+                v *= _SCALE;
             }
-
-        friend Shape(const Shape& s)
-            : _pos(s._pos), _center(s._center), _rmode(s._rmode) {}
-
-        void rotate() {
-            if(_rmode == NONE) return;
-
-            if(_straight) {
-                for(vec2& v: _pos) {
-                    v = _ROTATE * (v - _center) + _center;
-                }
-            }
-            else{
-                for(vec2& v: _pos) {
-                    v = _ROTATE_REVERSE * (v - _center) + _center;
-                }
-            }
-                
-            if(_rmode == SEMI) _straight = !_straight;
+            _center *= _SCALE;
         }
-    private:
-        static const _ANGLE = M_PI/2;
-        static const mat2 _ROTATE = mat2 ( cos(_ANGLE), sin(_ANGLE), -sin(_ANGLE), cos(_ANGLE) );
-        static const mat2 _ROTATE_REVERSE = mat2 ( cos(-_ANGLE), sin(-_ANGLE), -sin(-_ANGLE), cos(-_ANGLE) );
-        static const vec2 _SCALE = vec2(diffX, diffY);
-        vector<vec2> _pos;
-        vec2 _center;
-        Rotation_mode _rmode;
-        bool _straight = true;
+
+    Shape(const Shape& s)
+        : _pos(s._pos), _center(s._center), _rmode(s._rmode) {}
+
+    void rotate() {
+        if(_rmode == NONE) return;
+
+        if(_straight) {
+            for(vec2& v: _pos) {
+                v = _ROTATE * (v - _center) + _center;
+            }
+        }
+        else{
+            for(vec2& v: _pos) {
+                v = _ROTATE_REVERSE * (v - _center) + _center;
+            }
+        }
+            
+        if(_rmode == SEMI) _straight = !_straight;
+    }
+
+    void move(vec2 offset){
+        for(vec2& v: _pos){
+            v += offset;
+        }
+        _center += offset;
+    }
+
+    const vector<vec2>& getPos(){
+        return _pos;
+    }
+
+    const vector<vec3>& getColor(){
+        return _color;
+    }
+
+    void setColor(vec3 val){
+        _color = vector<vec3>(_pos.size(), val);
+    }
+private:
+    static float _ANGLE;
+    static mat2 _ROTATE;
+    static mat2 _ROTATE_REVERSE;
+    static vec2 _SCALE;
+
+    vector<vec2> _pos;
+    vector<vec3> _color;
+    vec2 _center;
+    Rotation_mode _rmode;
+    bool _straight = true;
 };
 
-const NUM_SHAPES = 7;
-const Shape shapes[NUM_SHAPES] = {
+float Shape::_ANGLE = M_PI/2;
+mat2 Shape::_ROTATE = mat2 ( cos(_ANGLE), sin(_ANGLE), -sin(_ANGLE), cos(_ANGLE) );
+mat2 Shape::_ROTATE_REVERSE = mat2 ( cos(-_ANGLE), sin(-_ANGLE), -sin(-_ANGLE), cos(-_ANGLE) );
+vec2 Shape::_SCALE = vec2(diffX, diffY);
+
+template<typename T>
+int vecSize(const vector<T>& v){
+    return v.size() * sizeof(T);
+}
+
+const int NUM_SHAPES = 7;
+Shape shapes[NUM_SHAPES] = {
     // O
     Shape({ vec2(-1, 0), vec2(1, 0), vec2(-1, -2), vec2(1, -2) },
         vec2(0, -1),
@@ -80,7 +111,7 @@ const Shape shapes[NUM_SHAPES] = {
     ),
     // Z
     Shape({ vec2(-1, 0), vec2(1, 0), vec2(-1, -1), vec2(1, -1),
-            vec2(0, -1), vec2(-2, -1), vec2(0, -2), vec2(-2, -2) },
+            vec2(0, -1), vec2(2, -1), vec2(0, -2), vec2(2, -2) },
         vec2(0.5, -0.5),
         SEMI
     ),
@@ -172,7 +203,44 @@ void init() {
 
 //----------------------------------------------------------------------------
 
+void display_single() {
+    GLuint vao;
+    glGenVertexArrays( 1, &vao );
+    glBindVertexArray( vao );
+
+    GLuint buffer;
+    glGenBuffers( 1, &buffer );
+    glBindBuffer( GL_ARRAY_BUFFER, buffer );
+
+    Shape& curr = shapes[3];
+    curr.setColor(vec3(1.0, 0.0, 0.0));
+    auto& pos = curr.getPos();
+    auto& color = curr.getColor();
+    for(auto& x: pos) cout<<x<<endl;
+
+    glBufferData( GL_ARRAY_BUFFER, vecSize(pos) + vecSize(color), &pos[0], GL_STATIC_DRAW );
+    glBufferSubData( GL_ARRAY_BUFFER, 0, vecSize(pos), &pos[0] );
+    glBufferSubData( GL_ARRAY_BUFFER, vecSize(pos), vecSize(color), &color[0] );
+
+    GLuint program = InitShader( "vshader.glsl", "fshader.glsl" );
+    glUseProgram( program );
+
+    GLuint loc = glGetAttribLocation( program, "vPosition" );
+    glEnableVertexAttribArray( loc );
+    glVertexAttribPointer( loc, 2, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0) );
+
+    GLuint vColor = glGetAttribLocation( program, "vColor" );
+    glEnableVertexAttribArray( vColor );
+    glVertexAttribPointer( vColor, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(vecSize(pos)) );
+
+    glClear( GL_COLOR_BUFFER_BIT );     // clear the window
+
+    glDrawArrays( GL_TRIANGLE_STRIP, 0, pos.size() );
+}
+
 void display() {
+    display_single();
+
     glBindVertexArray( grid_vao );
     glDrawArrays( GL_LINES, 0, NUM_GRID_LINE_POINTS);
     glFlush();

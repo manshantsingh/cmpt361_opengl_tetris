@@ -22,10 +22,12 @@ SOURCE= Tetris.cpp include/InitShader.cpp
 # The compiler we are using 
 CC= g++
 
+CUSTOM_FLAGS = -std=c++11
+
 # The flags that will be used to compile the object file.
 # If you want to debug your program,
 # you can add '-g' on the following line
-CFLAGS= -O3 -g -Wall -pedantic -DGL_GLEXT_PROTOTYPES
+CFLAGS= -O3 -g -Wall -pedantic -DGL_GLEXT_PROTOTYPES $(CUSTOM_FLAGS)
 
 # The name of the final executable 
 EXECUTABLE=Tetris
