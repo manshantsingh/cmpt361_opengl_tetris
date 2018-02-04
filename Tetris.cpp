@@ -24,82 +24,121 @@ const float gravity_time = 1000.0;
 
 enum Rotation_mode { NONE, SEMI, FULL};
 
+struct coord{
+    int x, y;
+    coord(){}
+    coord(int a, int b): x(a), y(b) {}
+    coord(const coord& another): x(another.x), y(another.y) {}
+};
+
 class Shape{
 public:
-    Shape(vector<vec2> positions, vec2 center, Rotation_mode rmode)
-        : _pos(positions), _center(center), _rmode(rmode) {
-            for(vec2& v: _pos){
-                v *= _SCALE;
-            }
-            _center *= _SCALE;
-        }
-
-    Shape(const Shape& s)
-        : _pos(s._pos), _center(s._center), _rmode(s._rmode) {
-            move(_START_POS_OFFSET);
-        }
+    Shape(vector<coord> pos, Rotation_mode rmode) : _pos(pos), _rmode(rmode) {}
+    Shape(const Shape& s) : _pos(s._pos), _rmode(s._rmode) {}
 
     void rotate() {
         if(_rmode == NONE) return;
 
         if(_straight) {
-            for(vec2& v: _pos) {
-                v = _ROTATE * (v - _center) + _center;
+            for(coord& v: _pos) {
+                int x = v.x - _center.x;
+                int y = v.y - _center.y;
+                v = coord(_center.x - y , _center.y + x);
             }
         }
         else{
-            for(vec2& v: _pos) {
-                v = _ROTATE_REVERSE * (v - _center) + _center;
+            for(coord& v: _pos) {
+                int x = v.x - _center.x;
+                int y = v.y - _center.y;
+                v = coord(_center.x + y , _center.y - x);
             }
         }
             
         if(_rmode == SEMI) _straight = !_straight;
     }
 
-    const vector<vec2>& getPos(){
-        return _pos;
+    vector<coord> getPos(){
+        vector<coord> v(_pos.size());
+        for(int i=0;i<v.size();i++){
+            v[i] = coord(_pos[i].x + _center.x, _pos[i].y + _center.y);
+        }
+        return v;
     }
 
-    const vector<vec3>& getColor(){
+    const vec3& getColor(){
         return _color;
     }
 
     void setColor(vec3 val){
-        _color = vector<vec3>(_pos.size(), val);
+        _color = val;
     }
 
     bool moveAndTestOutOfScreen(){
-        move(_GRAVITY);
+        // move(_GRAVITY);
         return _center.y < -cornerY;
     }
 private:
-    static float _ANGLE;
-    static mat2 _ROTATE;
-    static mat2 _ROTATE_REVERSE;
-    static vec2 _SCALE;
-    static vec2 _GRAVITY;
-    static vec2 _START_POS_OFFSET;
+    static coord _START_POS;
 
-    vector<vec2> _pos;
-    vector<vec3> _color;
-    vec2 _center;
+    vector<coord> _pos;
+    vec3 _color;
+    coord _center = _START_POS;
     Rotation_mode _rmode;
     bool _straight = true;
-
-    void move(vec2 offset){
-        for(vec2& v: _pos){
-            v += offset;
-        }
-        _center += offset;
-    }
 };
+coord Shape::_START_POS = coord(NUM_COLS/2, NUM_ROWS-1);
 
-float Shape::_ANGLE = M_PI/2;
-mat2 Shape::_ROTATE = mat2 ( cos(_ANGLE), sin(_ANGLE), -sin(_ANGLE), cos(_ANGLE) );
-mat2 Shape::_ROTATE_REVERSE = mat2 ( cos(-_ANGLE), sin(-_ANGLE), -sin(-_ANGLE), cos(-_ANGLE) );
-vec2 Shape::_SCALE = vec2(diffX, diffY);
-vec2 Shape::_GRAVITY = vec2(0, -diffY);
-vec2 Shape::_START_POS_OFFSET = vec2(0, cornerY);
+void appendPoints(const vector<coord>& pos, vector<vec2>& points, vec3 color, vector<vec3>& colors){
+    for(coord v: pos){
+        vec2 temp(v.x * diffX - cornerX, v.y * diffY - cornerY);
+
+        if(points.size()){
+            points.push_back(points.back());
+            points.push_back(temp);
+            colors.push_back(color);
+            colors.push_back(color);
+        }
+
+        points.push_back(temp);
+        temp.x += diffX;
+        points.push_back(temp);
+        temp += vec2(-diffX, diffY);
+        points.push_back(temp);
+        temp.x += diffX;
+        points.push_back(temp);
+
+        colors.push_back(color);
+        colors.push_back(color);
+        colors.push_back(color);
+        colors.push_back(color);
+    }
+}
+
+void appendPoints(const vector<coord>& pos, vector<vec2>& points, const vector<vec3>& color, vector<vec3>& colors){
+    for(int i=0;i<pos.size();i++){
+        vec2 temp(pos[i].x * diffX - cornerX, pos[i].y * diffY - cornerY);
+
+        if(points.size()){
+            points.push_back(points.back());
+            points.push_back(temp);
+            colors.push_back(color[i]);
+            colors.push_back(color[i]);
+        }
+
+        points.push_back(temp);
+        temp.x += diffX;
+        points.push_back(temp);
+        temp += vec2(-diffX, diffY);
+        points.push_back(temp);
+        temp.x += diffX;
+        points.push_back(temp);
+
+        colors.push_back(color[i]);
+        colors.push_back(color[i]);
+        colors.push_back(color[i]);
+        colors.push_back(color[i]);
+    }
+}
 
 template<typename T>
 int vecSize(const vector<T>& v){
@@ -109,43 +148,19 @@ int vecSize(const vector<T>& v){
 const int NUM_SHAPES = 7;
 Shape shapes[NUM_SHAPES] = {
     // O
-    Shape({ vec2(-1, 0), vec2(1, 0), vec2(-1, -2), vec2(1, -2) },
-        vec2(0, -1),
-        NONE
-    ),
+    Shape({ coord(0, 0), coord(0, -1), coord(1, 0), coord(1, -1) }, NONE),
     // I
-    Shape({ vec2(-2, 0), vec2(2, 0), vec2(-2, -1), vec2(2, -1) },
-        vec2(0.5, -0.5),
-        SEMI
-    ),
+    Shape({ coord(-2, 0), coord(-1, 0), coord(0, 0), coord(1, 0) }, SEMI),
     // S
-    Shape({ vec2(2, 0), vec2(0, 0), vec2(2, -1), vec2(-0, -1),
-            vec2(1, -1), vec2(-1, -1), vec2(1, -2), vec2(-1, -2) },
-        vec2(0.5, -0.5),
-        SEMI
-    ),
+    Shape({ coord(0, 0), coord(1, 0), coord(-1, -1), coord(0, -1) }, SEMI),
     // Z
-    Shape({ vec2(-1, 0), vec2(1, 0), vec2(-1, -1), vec2(1, -1),
-            vec2(0, -1), vec2(2, -1), vec2(0, -2), vec2(2, -2) },
-        vec2(0.5, -0.5),
-        SEMI
-    ),
+    Shape({ coord(-1, 0), coord(0, 0), coord(0, -1), coord(1, -1) }, SEMI),
     // L
-    Shape({ vec2(2, 0), vec2(2, -1), vec2(-1, 0), vec2(0, -1), vec2(-1, -2), vec2(0, -2) },
-        vec2(0.5, -0.5),
-        FULL
-    ),
+    Shape({ coord(-1, 0), coord(0, 0), coord(1, 0), coord(-1, -1) }, FULL),
     // J
-    Shape({ vec2(-1, 0), vec2(-1, -1), vec2(2, 0), vec2(1, -1), vec2(2, -2), vec2(1, -2) },
-        vec2(0.5, -0.5),
-        FULL
-    ),
+    Shape({ coord(-1, 0), coord(0, 0), coord(1, 0), coord(1, -1) }, FULL),
     // T
-    Shape({ vec2(0, -2), vec2(1, -2), vec2(0, -1), vec2(1, -1),
-            vec2(-1, -1), vec2(2, -1), vec2(-1, 0), vec2(2, 0) },
-        vec2(0.5, -0.5),
-        FULL
-    )
+    Shape({ coord(-1, 0), coord(0, 0), coord(1, 0), coord(0, -1) }, FULL)
 };
 
 Shape* curr;
@@ -229,12 +244,23 @@ void display_single() {
     glGenBuffers( 1, &buffer );
     glBindBuffer( GL_ARRAY_BUFFER, buffer );
 
-    auto& pos = curr->getPos();
-    auto& color = curr->getColor();
+    auto currPos = curr->getPos();
+    auto& currColor = curr->getColor();
 
-    glBufferData( GL_ARRAY_BUFFER, vecSize(pos) + vecSize(color), &pos[0], GL_STATIC_DRAW );
-    glBufferSubData( GL_ARRAY_BUFFER, 0, vecSize(pos), &pos[0] );
-    glBufferSubData( GL_ARRAY_BUFFER, vecSize(pos), vecSize(color), &color[0] );
+    vector<vec2> points;
+    vector<vec3> colors;
+    appendPoints(currPos, points, currColor, colors);
+
+    cout<<"currPos.size: "<<currPos.size()<<endl;
+    for(auto& x: currPos) cout<<x.x<<' '<<x.y<<endl;cout<<endl;
+    cout<<"points.size: "<<points.size()<<endl;
+    for(auto& x: points) cout<<x<<endl;cout<<endl;
+    cout<<"colors.size: "<<colors.size()<<endl;
+    for(auto& x: colors) cout<<x<<endl;cout<<endl;
+
+    glBufferData( GL_ARRAY_BUFFER, vecSize(points) + vecSize(colors), &points[0], GL_STATIC_DRAW );
+    // glBufferSubData( GL_ARRAY_BUFFER, 0, vecSize(points), &points[0] );
+    glBufferSubData( GL_ARRAY_BUFFER, vecSize(points), vecSize(colors), &colors[0] );
 
     GLuint program = InitShader( "vshader.glsl", "fshader.glsl" );
     glUseProgram( program );
@@ -245,11 +271,11 @@ void display_single() {
 
     GLuint vColor = glGetAttribLocation( program, "vColor" );
     glEnableVertexAttribArray( vColor );
-    glVertexAttribPointer( vColor, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(vecSize(pos)) );
+    glVertexAttribPointer( vColor, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(vecSize(points)) );
 
     glClear( GL_COLOR_BUFFER_BIT );     // clear the window
 
-    glDrawArrays( GL_TRIANGLE_STRIP, 0, pos.size() );
+    glDrawArrays( GL_TRIANGLE_STRIP, 0, points.size() );
 }
 
 void display() {
@@ -365,7 +391,7 @@ int main(int argc, char **argv) {
 
     glutIgnoreKeyRepeat(true);
 
-    glutTimerFunc(gravity_time, gravity, 0);
+    // glutTimerFunc(gravity_time, gravity, 0);
 
     glutMainLoop();
     return 0;
