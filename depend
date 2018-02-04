@@ -121,7 +121,13 @@ Tetris.o: Tetris.cpp include/Angel.h \
  /usr/include/GL/freeglut_std.h \
  /usr/lib/gcc/x86_64-pc-cygwin/6.4.0/include/c++/stdlib.h \
  /usr/include/GL/freeglut_ext.h /usr/include/GL/freeglut_ext.h \
- include/vec.h include/Angel.h include/mat.h include/CheckError.h
+ include/vec.h include/Angel.h include/mat.h include/CheckError.h \
+ /usr/lib/gcc/x86_64-pc-cygwin/6.4.0/include/c++/vector \
+ /usr/lib/gcc/x86_64-pc-cygwin/6.4.0/include/c++/bits/stl_construct.h \
+ /usr/lib/gcc/x86_64-pc-cygwin/6.4.0/include/c++/bits/stl_uninitialized.h \
+ /usr/lib/gcc/x86_64-pc-cygwin/6.4.0/include/c++/bits/stl_vector.h \
+ /usr/lib/gcc/x86_64-pc-cygwin/6.4.0/include/c++/bits/stl_bvector.h \
+ /usr/lib/gcc/x86_64-pc-cygwin/6.4.0/include/c++/bits/vector.tcc
 InitShader.o: include/InitShader.cpp include/Angel.h \
  /usr/lib/gcc/x86_64-pc-cygwin/6.4.0/include/c++/cmath \
  /usr/lib/gcc/x86_64-pc-cygwin/6.4.0/include/c++/x86_64-pc-cygwin/bits/c++config.h \

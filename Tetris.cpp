@@ -4,7 +4,7 @@
 #include "include/Angel.h"
 
 // remove these before submission
-#include <iostream>
+#include <vector>
 using namespace std;
 
 const int NUM_ROWS = 20;
@@ -17,6 +17,91 @@ const float diffX = 2.0/(NUM_COLS+1), diffY=2.0/(NUM_ROWS+1); // this should giv
 const float cornerX = diffX*5, cornerY = diffY*10;
 
 //----------------------------------------------------------------------------
+
+enum Rotation_mode { NONE, SEMI, FULL}
+
+class Shape{
+    public:
+        Shape(vector<vec2> positions, vec2 center, Rotation_mode rmode)
+            : _pos(positions), _center(center), _rmode(rmode) {
+                for(vec2& v: _pos){
+                    v *= _SCALE;
+                }
+                _center *= _SCALE;
+            }
+
+        friend Shape(const Shape& s)
+            : _pos(s._pos), _center(s._center), _rmode(s._rmode) {}
+
+        void rotate() {
+            if(_rmode == NONE) return;
+
+            if(_straight) {
+                for(vec2& v: _pos) {
+                    v = _ROTATE * (v - _center) + _center;
+                }
+            }
+            else{
+                for(vec2& v: _pos) {
+                    v = _ROTATE_REVERSE * (v - _center) + _center;
+                }
+            }
+                
+            if(_rmode == SEMI) _straight = !_straight;
+        }
+    private:
+        static const _ANGLE = M_PI/2;
+        static const mat2 _ROTATE = mat2 ( cos(_ANGLE), sin(_ANGLE), -sin(_ANGLE), cos(_ANGLE) );
+        static const mat2 _ROTATE_REVERSE = mat2 ( cos(-_ANGLE), sin(-_ANGLE), -sin(-_ANGLE), cos(-_ANGLE) );
+        static const vec2 _SCALE = vec2(diffX, diffY);
+        vector<vec2> _pos;
+        vec2 _center;
+        Rotation_mode _rmode;
+        bool _straight = true;
+};
+
+const NUM_SHAPES = 7;
+const Shape shapes[NUM_SHAPES] = {
+    // O
+    Shape({ vec2(-1, 0), vec2(1, 0), vec2(-1, -2), vec2(1, -2) },
+        vec2(0, -1),
+        NONE
+    ),
+    // I
+    Shape({ vec2(-2, 0), vec2(2, 0), vec2(-2, -1), vec2(2, -1) },
+        vec2(0.5, -0.5),
+        SEMI
+    ),
+    // S
+    Shape({ vec2(2, 0), vec2(0, 0), vec2(2, -1), vec2(-0, -1),
+            vec2(1, -1), vec2(-1, -1), vec2(1, -2), vec2(-1, -2) },
+        vec2(0.5, -0.5),
+        SEMI
+    ),
+    // Z
+    Shape({ vec2(-1, 0), vec2(1, 0), vec2(-1, -1), vec2(1, -1),
+            vec2(0, -1), vec2(-2, -1), vec2(0, -2), vec2(-2, -2) },
+        vec2(0.5, -0.5),
+        SEMI
+    ),
+    // L
+    Shape({ vec2(2, 0), vec2(2, -1), vec2(-1, 0), vec2(0, -1), vec2(-1, -2), vec2(0, -2) },
+        vec2(0.5, -0.5),
+        FULL
+    ),
+    // J
+    Shape({ vec2(-1, 0), vec2(-1, -1), vec2(2, 0), vec2(1, -1), vec2(2, -2), vec2(1, -2) },
+        vec2(0.5, -0.5),
+        FULL
+    ),
+    // T
+    Shape({ vec2(0, -2), vec2(1, -2), vec2(0, -1), vec2(1, -1),
+            vec2(-1, -1), vec2(2, -1), vec2(-1, 0), vec2(2, 0) },
+        vec2(0.5, -0.5),
+        FULL
+    )
+};
+
 
 GLuint grid_vao;
 
