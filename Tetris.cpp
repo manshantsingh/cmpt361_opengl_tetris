@@ -18,7 +18,7 @@ const int NUM_GRID_LINE_POINTS = 4 + 2*NUM_ROWS + 2*NUM_COLS;
 const float diffX = 2.0/(NUM_COLS+1), diffY=2.0/(NUM_ROWS+1); // this should give half a cell border
 const float cornerX = diffX*5, cornerY = diffY*10;
 
-const float gravity_time = 100.0;
+const float gravity_time = 1000.0;
 
 //----------------------------------------------------------------------------
 
