@@ -49,6 +49,9 @@ OBJECT= $(SOURCE:.cpp=.o)
 all: $(OBJECT) depend
 	$(CC) $(CFLAGS) $(INCLUDEFLAG) $(LIBFLAG) $(OBJECT) -o $(EXECUTABLE) $(LDFLAGS) 
 
+run: all
+	./$(EXECUTABLE)
+
 depend:
 	$(CC) -M $(SOURCE) > depend
 
