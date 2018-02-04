@@ -3,8 +3,10 @@
 
 #include "include/Angel.h"
 
-// remove these before submission
+#include <cstdlib>
+#include <ctime>
 #include <vector>
+
 using namespace std;
 
 const int NUM_ROWS = 20;
@@ -15,6 +17,8 @@ const int WINDOW_SIZE_Y = WINDOWS_SIZE_SCALE * (NUM_ROWS+2);
 const int NUM_GRID_LINE_POINTS = 4 + 2*NUM_ROWS + 2*NUM_COLS;
 const float diffX = 2.0/(NUM_COLS+1), diffY=2.0/(NUM_ROWS+1); // this should give half a cell border
 const float cornerX = diffX*5, cornerY = diffY*10;
+
+const float gravity_time = 100.0;
 
 //----------------------------------------------------------------------------
 
@@ -31,7 +35,9 @@ public:
         }
 
     Shape(const Shape& s)
-        : _pos(s._pos), _center(s._center), _rmode(s._rmode) {}
+        : _pos(s._pos), _center(s._center), _rmode(s._rmode) {
+            move(_START_POS_OFFSET);
+        }
 
     void rotate() {
         if(_rmode == NONE) return;
@@ -50,13 +56,6 @@ public:
         if(_rmode == SEMI) _straight = !_straight;
     }
 
-    void move(vec2 offset){
-        for(vec2& v: _pos){
-            v += offset;
-        }
-        _center += offset;
-    }
-
     const vector<vec2>& getPos(){
         return _pos;
     }
@@ -68,23 +67,39 @@ public:
     void setColor(vec3 val){
         _color = vector<vec3>(_pos.size(), val);
     }
+
+    bool moveAndTestOutOfScreen(){
+        move(_GRAVITY);
+        return _center.y < -cornerY;
+    }
 private:
     static float _ANGLE;
     static mat2 _ROTATE;
     static mat2 _ROTATE_REVERSE;
     static vec2 _SCALE;
+    static vec2 _GRAVITY;
+    static vec2 _START_POS_OFFSET;
 
     vector<vec2> _pos;
     vector<vec3> _color;
     vec2 _center;
     Rotation_mode _rmode;
     bool _straight = true;
+
+    void move(vec2 offset){
+        for(vec2& v: _pos){
+            v += offset;
+        }
+        _center += offset;
+    }
 };
 
 float Shape::_ANGLE = M_PI/2;
 mat2 Shape::_ROTATE = mat2 ( cos(_ANGLE), sin(_ANGLE), -sin(_ANGLE), cos(_ANGLE) );
 mat2 Shape::_ROTATE_REVERSE = mat2 ( cos(-_ANGLE), sin(-_ANGLE), -sin(-_ANGLE), cos(-_ANGLE) );
 vec2 Shape::_SCALE = vec2(diffX, diffY);
+vec2 Shape::_GRAVITY = vec2(0, -diffY);
+vec2 Shape::_START_POS_OFFSET = vec2(0, cornerY);
 
 template<typename T>
 int vecSize(const vector<T>& v){
@@ -132,6 +147,8 @@ Shape shapes[NUM_SHAPES] = {
         FULL
     )
 };
+
+Shape* curr;
 
 
 GLuint grid_vao;
@@ -212,11 +229,8 @@ void display_single() {
     glGenBuffers( 1, &buffer );
     glBindBuffer( GL_ARRAY_BUFFER, buffer );
 
-    Shape& curr = shapes[3];
-    curr.setColor(vec3(1.0, 0.0, 0.0));
-    auto& pos = curr.getPos();
-    auto& color = curr.getColor();
-    for(auto& x: pos) cout<<x<<endl;
+    auto& pos = curr->getPos();
+    auto& color = curr->getColor();
 
     glBufferData( GL_ARRAY_BUFFER, vecSize(pos) + vecSize(color), &pos[0], GL_STATIC_DRAW );
     glBufferSubData( GL_ARRAY_BUFFER, 0, vecSize(pos), &pos[0] );
@@ -250,36 +264,80 @@ void display() {
 bool downPressed=false;
 void keyboard(unsigned char key, int x, int y) {
     switch ( key ) {
-    case 'w':
-        if(!downPressed){
-            downPressed=true;
-            cout<<"going down\n";
-        }
-            
-        break;
-    case 033:
-        exit( EXIT_SUCCESS );
-        break;
+        case 'w':
+            if(!downPressed){
+                downPressed=true;
+                cout<<"going down\n";
+            }
+                
+            break;
+        case 033:
+        case 'q':
+            exit( EXIT_SUCCESS );
+            break;
+    }
+}
+
+void keyboardSpecial( int key, int x, int y )
+{
+    switch(key){
+        case GLUT_KEY_DOWN:
+            if(!downPressed){
+                downPressed=true;
+                cout<<"going down special\n";
+            }
+            break;
     }
 }
 
 void keyboardUp(unsigned char key, int x, int y) {
     switch ( key ) {
-    case 'w':
-        if(downPressed){
-            downPressed=false;
-            cout<<"keyboardUp"<<endl;
-        }
-        break;
-    case 033:
-        exit( EXIT_SUCCESS );
-        break;
+        case 'w':
+            if(downPressed){
+                downPressed=false;
+                cout<<"keyboardUp"<<endl;
+            }
+            break;
+    }
+}
+
+void keyboardSpecialUp( int key, int x, int y )
+{
+    switch(key){
+        case GLUT_KEY_DOWN:
+            if(downPressed){
+                downPressed=false;
+                cout<<"keyboardUp special"<<endl;
+            }
+            break;
     }
 }
 
 //----------------------------------------------------------------------------
 
+void setNewCurr(){
+    if(curr != nullptr){
+        delete curr;
+    }
+    curr = new Shape(shapes[rand()%NUM_SHAPES]);
+    curr->setColor(vec3(1.0, 0.0, 0.0));
+}
+
+void gravity(int){
+    if(curr == nullptr || curr->moveAndTestOutOfScreen()){
+        setNewCurr();
+    }
+
+    glutPostRedisplay();
+    glutTimerFunc(gravity_time, gravity, 0);
+}
+
+//----------------------------------------------------------------------------
+
 int main(int argc, char **argv) {
+    srand(time(nullptr));
+    setNewCurr();
+
     glutInit( &argc, argv );
     glutInitDisplayMode( GLUT_RGBA );
     glutInitWindowSize( WINDOW_SIZE_X, WINDOW_SIZE_Y );
@@ -298,9 +356,16 @@ int main(int argc, char **argv) {
     init();
 
     glutDisplayFunc( display );
+
     glutKeyboardFunc( keyboard );
     glutKeyboardUpFunc( keyboardUp );
+
+    glutSpecialFunc( keyboardSpecial );
+    glutSpecialUpFunc( keyboardSpecialUp );
+
     glutIgnoreKeyRepeat(true);
+
+    glutTimerFunc(gravity_time, gravity, 0);
 
     glutMainLoop();
     return 0;
