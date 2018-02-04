@@ -52,7 +52,7 @@ all: $(OBJECT) depend
 depend:
 	$(CC) -M $(SOURCE) > depend
 
-$(OBJECT):
+$(OBJECT): $(@:.o=.cpp)
 	$(CC) $(CFLAGS) $(INCLUDEFLAG) -c -o $@ $(@:.o=.cpp)
 
 clean_object:
