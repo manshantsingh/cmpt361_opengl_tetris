@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <vector>
+#include <map>
 
 using namespace std;
 
@@ -18,7 +19,17 @@ const int NUM_GRID_LINE_POINTS = 4 + 2*NUM_ROWS + 2*NUM_COLS;
 const float diffX = 2.0/(NUM_COLS+1), diffY=2.0/(NUM_ROWS+1); // this should give half a cell border
 const float cornerX = diffX*5, cornerY = diffY*10;
 
-const float gravity_time = 1000.0;
+const float gravity_time = 100.0;
+
+const int NUM_COLORS = 6;
+vec3 SHAPE_COLORS[NUM_COLORS] = {
+    vec3(1.0, 0.0, 0.0),
+    vec3(0.0, 1.0, 0.0),
+    vec3(0.0, 0.0, 1.0),
+    vec3(1.0, 1.0, 0.0),
+    vec3(0.0, 1.0, 1.0),
+    vec3(1.0, 0.0, 1.0)
+};
 
 //----------------------------------------------------------------------------
 
@@ -41,16 +52,12 @@ public:
 
         if(_straight) {
             for(coord& v: _pos) {
-                int x = v.x - _center.x;
-                int y = v.y - _center.y;
-                v = coord(_center.x - y , _center.y + x);
+                v = coord(-v.y , v.x);
             }
         }
         else{
             for(coord& v: _pos) {
-                int x = v.x - _center.x;
-                int y = v.y - _center.y;
-                v = coord(_center.x + y , _center.y - x);
+                v = coord(v.y , -v.x);
             }
         }
             
@@ -59,86 +66,35 @@ public:
 
     vector<coord> getPos(){
         vector<coord> v(_pos.size());
-        for(int i=0;i<v.size();i++){
+        for(unsigned int i=0;i<v.size();i++){
             v[i] = coord(_pos[i].x + _center.x, _pos[i].y + _center.y);
         }
         return v;
     }
 
-    const vec3& getColor(){
+    vec3* getColor(){
         return _color;
     }
 
-    void setColor(vec3 val){
+    void setColor(vec3* val){
         _color = val;
     }
 
     bool moveAndTestOutOfScreen(){
         // move(_GRAVITY);
-        return _center.y < -cornerY;
+        _center.y--;
+        return _center.y <= 0;
     }
 private:
     static coord _START_POS;
 
     vector<coord> _pos;
-    vec3 _color;
+    vec3* _color;
     coord _center = _START_POS;
     Rotation_mode _rmode;
     bool _straight = true;
 };
 coord Shape::_START_POS = coord(NUM_COLS/2, NUM_ROWS-1);
-
-void appendPoints(const vector<coord>& pos, vector<vec2>& points, vec3 color, vector<vec3>& colors){
-    for(coord v: pos){
-        vec2 temp(v.x * diffX - cornerX, v.y * diffY - cornerY);
-
-        if(points.size()){
-            points.push_back(points.back());
-            points.push_back(temp);
-            colors.push_back(color);
-            colors.push_back(color);
-        }
-
-        points.push_back(temp);
-        temp.x += diffX;
-        points.push_back(temp);
-        temp += vec2(-diffX, diffY);
-        points.push_back(temp);
-        temp.x += diffX;
-        points.push_back(temp);
-
-        colors.push_back(color);
-        colors.push_back(color);
-        colors.push_back(color);
-        colors.push_back(color);
-    }
-}
-
-void appendPoints(const vector<coord>& pos, vector<vec2>& points, const vector<vec3>& color, vector<vec3>& colors){
-    for(int i=0;i<pos.size();i++){
-        vec2 temp(pos[i].x * diffX - cornerX, pos[i].y * diffY - cornerY);
-
-        if(points.size()){
-            points.push_back(points.back());
-            points.push_back(temp);
-            colors.push_back(color[i]);
-            colors.push_back(color[i]);
-        }
-
-        points.push_back(temp);
-        temp.x += diffX;
-        points.push_back(temp);
-        temp += vec2(-diffX, diffY);
-        points.push_back(temp);
-        temp.x += diffX;
-        points.push_back(temp);
-
-        colors.push_back(color[i]);
-        colors.push_back(color[i]);
-        colors.push_back(color[i]);
-        colors.push_back(color[i]);
-    }
-}
 
 template<typename T>
 int vecSize(const vector<T>& v){
@@ -167,6 +123,71 @@ Shape* curr;
 
 
 GLuint grid_vao;
+
+vector<vec2> ground_points;
+vector<vec3> ground_colors;
+
+vector<vector<vec3*>> cell_colors;
+
+
+void appendPoints(const vector<coord>& pos, vector<vec2>& points, vec3 color, vector<vec3>& colors){
+    for(coord v: pos){
+        vec2 temp(v.x * diffX - cornerX, v.y * diffY - cornerY);
+
+        if(points.size()){
+            points.push_back(points.back());
+            points.push_back(temp);
+            colors.push_back(color);
+            colors.push_back(color);
+        }
+
+        points.push_back(temp);
+        temp.x += diffX;
+        points.push_back(temp);
+        temp += vec2(-diffX, diffY);
+        points.push_back(temp);
+        temp.x += diffX;
+        points.push_back(temp);
+
+        colors.push_back(color);
+        colors.push_back(color);
+        colors.push_back(color);
+        colors.push_back(color);
+    }
+}
+
+void recomputePoints(){
+    ground_points.clear();
+    ground_colors.clear();
+
+    for(int i=0; i<NUM_ROWS; i++){
+        for(int j=0; j<NUM_COLS; j++){
+            vec3* v = cell_colors[i][j];
+            if(v==nullptr) continue;
+            vec2 temp(j * diffX - cornerX, i * diffY - cornerY);
+
+            if(ground_points.size()){
+                ground_points.push_back(ground_points.back());
+                ground_points.push_back(temp);
+                ground_colors.push_back(*v);
+                ground_colors.push_back(*v);
+            }
+
+            ground_points.push_back(temp);
+            temp.x += diffX;
+            ground_points.push_back(temp);
+            temp += vec2(-diffX, diffY);
+            ground_points.push_back(temp);
+            temp.x += diffX;
+            ground_points.push_back(temp);
+
+            ground_colors.push_back(*v);
+            ground_colors.push_back(*v);
+            ground_colors.push_back(*v);
+            ground_colors.push_back(*v);
+        }
+    }
+}
 
 void init_grid() {
     glGenVertexArrays( 1, &grid_vao );
@@ -233,9 +254,32 @@ void init() {
     glClearColor( 0.0, 0.0, 0.0, 1.0 ); // white background
 }
 
+// void update_ground() {
+//     glGenVertexArrays( 1, &ground_vao );
+//     glBindVertexArray( ground_vao );
+
+//     GLuint buffer;
+//     glGenBuffers( 1, &buffer );
+//     glBindBuffer( GL_ARRAY_BUFFER, buffer );
+
+//     glBufferData( GL_ARRAY_BUFFER, vecSize(ground_points) + vecSize(ground_colors), &ground_points[0], GL_STATIC_DRAW );
+//     glBufferSubData( GL_ARRAY_BUFFER, vecSize(ground_points), vecSize(ground_colors), &ground_colors[0] );
+
+//     GLuint program = InitShader( "vshader.glsl", "fshader.glsl" );
+//     glUseProgram( program );
+
+//     GLuint loc = glGetAttribLocation( program, "vPosition" );
+//     glEnableVertexAttribArray( loc );
+//     glVertexAttribPointer( loc, 2, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0) );
+
+//     GLuint vColor = glGetAttribLocation( program, "vColor" );
+//     glEnableVertexAttribArray( vColor );
+//     glVertexAttribPointer( vColor, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(vecSize(ground_points)) );
+// }
+
 //----------------------------------------------------------------------------
 
-void display_single() {
+void display_curr() {
     GLuint vao;
     glGenVertexArrays( 1, &vao );
     glBindVertexArray( vao );
@@ -244,22 +288,16 @@ void display_single() {
     glGenBuffers( 1, &buffer );
     glBindBuffer( GL_ARRAY_BUFFER, buffer );
 
-    auto currPos = curr->getPos();
-    auto& currColor = curr->getColor();
-
     vector<vec2> points;
     vector<vec3> colors;
-    appendPoints(currPos, points, currColor, colors);
+    appendPoints(curr->getPos(), points, *curr->getColor(), colors);
 
-    cout<<"currPos.size: "<<currPos.size()<<endl;
-    for(auto& x: currPos) cout<<x.x<<' '<<x.y<<endl;cout<<endl;
-    cout<<"points.size: "<<points.size()<<endl;
-    for(auto& x: points) cout<<x<<endl;cout<<endl;
-    cout<<"colors.size: "<<colors.size()<<endl;
-    for(auto& x: colors) cout<<x<<endl;cout<<endl;
+    // for(auto& x: points) cout<<x<<endl; cout<<endl;
+    // for(auto& x: colors) cout<<x<<endl; cout<<endl;
+
+    // cout<<"cc: "<<*curr->getColor()<<endl;
 
     glBufferData( GL_ARRAY_BUFFER, vecSize(points) + vecSize(colors), &points[0], GL_STATIC_DRAW );
-    // glBufferSubData( GL_ARRAY_BUFFER, 0, vecSize(points), &points[0] );
     glBufferSubData( GL_ARRAY_BUFFER, vecSize(points), vecSize(colors), &colors[0] );
 
     GLuint program = InitShader( "vshader.glsl", "fshader.glsl" );
@@ -273,16 +311,44 @@ void display_single() {
     glEnableVertexAttribArray( vColor );
     glVertexAttribPointer( vColor, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(vecSize(points)) );
 
-    glClear( GL_COLOR_BUFFER_BIT );     // clear the window
-
     glDrawArrays( GL_TRIANGLE_STRIP, 0, points.size() );
 }
 
+void display_ground() {
+    GLuint vao;
+    glGenVertexArrays( 1, &vao );
+    glBindVertexArray( vao );
+
+    GLuint buffer;
+    glGenBuffers( 1, &buffer );
+    glBindBuffer( GL_ARRAY_BUFFER, buffer );
+
+    glBufferData( GL_ARRAY_BUFFER, vecSize(ground_points) + vecSize(ground_colors), &ground_points[0], GL_STATIC_DRAW );
+    glBufferSubData( GL_ARRAY_BUFFER, vecSize(ground_points), vecSize(ground_colors), &ground_colors[0] );
+
+    GLuint program = InitShader( "vshader.glsl", "fshader.glsl" );
+    glUseProgram( program );
+
+    GLuint loc = glGetAttribLocation( program, "vPosition" );
+    glEnableVertexAttribArray( loc );
+    glVertexAttribPointer( loc, 2, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0) );
+
+    GLuint vColor = glGetAttribLocation( program, "vColor" );
+    glEnableVertexAttribArray( vColor );
+    glVertexAttribPointer( vColor, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(vecSize(ground_points)) );
+
+    glDrawArrays( GL_TRIANGLE_STRIP, 0, ground_points.size() );
+}
+
 void display() {
-    display_single();
+    glClear( GL_COLOR_BUFFER_BIT );     // clear the window
+
+    display_curr();
+    display_ground();
 
     glBindVertexArray( grid_vao );
     glDrawArrays( GL_LINES, 0, NUM_GRID_LINE_POINTS);
+
     glFlush();
 }
 
@@ -290,12 +356,8 @@ void display() {
 bool downPressed=false;
 void keyboard(unsigned char key, int x, int y) {
     switch ( key ) {
-        case 'w':
-            if(!downPressed){
-                downPressed=true;
-                cout<<"going down\n";
-            }
-                
+        case 'r':
+            cout<<"\n\n\nMISSING RESTART\n\n\n"; 
             break;
         case 033:
         case 'q':
@@ -313,16 +375,10 @@ void keyboardSpecial( int key, int x, int y )
                 cout<<"going down special\n";
             }
             break;
-    }
-}
-
-void keyboardUp(unsigned char key, int x, int y) {
-    switch ( key ) {
-        case 'w':
-            if(downPressed){
-                downPressed=false;
-                cout<<"keyboardUp"<<endl;
-            }
+        case GLUT_KEY_UP:
+            cout<<"up pressed"<<endl;
+            curr->rotate();
+            glutPostRedisplay();
             break;
     }
 }
@@ -342,11 +398,46 @@ void keyboardSpecialUp( int key, int x, int y )
 //----------------------------------------------------------------------------
 
 void setNewCurr(){
+    cout<<"gets here\n";
     if(curr != nullptr){
+        auto pos=curr->getPos();
+        auto* color=curr->getColor();
+        for(auto& v: pos){
+            if(v.x<0||v.y<0) {
+                // TODO
+                cout<<v.x<<" while limit: "<<NUM_COLS<<"\n"<<v.y<<" while limit: "<<NUM_ROWS<<endl<<endl;
+                continue;
+            }
+            cell_colors[v.y][v.x]=color;
+        }
+        auto it=cell_colors.begin();
+        bool somethingChanged=false;
+        while(it!=cell_colors.end()){
+            bool rowFull=true;
+            for(auto x: *it){
+                if(x==nullptr){
+                    rowFull=false;
+                    break;
+                }
+            }
+            if(rowFull){
+                somethingChanged=true;
+                it = cell_colors.erase(it);
+            }
+            else it++;
+        }
+        cout<<"somethingChanged: "<<(somethingChanged?"true":"false")<<endl;
+        if(somethingChanged){
+            for(int i=cell_colors.size();i<NUM_ROWS;i++) cell_colors.emplace_back(NUM_COLS, nullptr);
+            recomputePoints();
+        }
+        else appendPoints(pos, ground_points, *color, ground_colors);
+        cout<<"color: "<<*color<<endl;
+        cout<<"points size: "<<ground_points.size()<<endl;
         delete curr;
     }
     curr = new Shape(shapes[rand()%NUM_SHAPES]);
-    curr->setColor(vec3(1.0, 0.0, 0.0));
+    curr->setColor(&SHAPE_COLORS[rand()%NUM_COLORS]);
 }
 
 void gravity(int){
@@ -361,8 +452,10 @@ void gravity(int){
 //----------------------------------------------------------------------------
 
 int main(int argc, char **argv) {
-    srand(time(nullptr));
+    cell_colors = vector<vector<vec3*>>(NUM_ROWS, vector<vec3*>(NUM_COLS, nullptr));
+    curr = nullptr;
     setNewCurr();
+    srand(time(nullptr));
 
     glutInit( &argc, argv );
     glutInitDisplayMode( GLUT_RGBA );
@@ -384,14 +477,13 @@ int main(int argc, char **argv) {
     glutDisplayFunc( display );
 
     glutKeyboardFunc( keyboard );
-    glutKeyboardUpFunc( keyboardUp );
 
     glutSpecialFunc( keyboardSpecial );
     glutSpecialUpFunc( keyboardSpecialUp );
 
     glutIgnoreKeyRepeat(true);
 
-    // glutTimerFunc(gravity_time, gravity, 0);
+    glutTimerFunc(gravity_time, gravity, 0);
 
     glutMainLoop();
     return 0;
