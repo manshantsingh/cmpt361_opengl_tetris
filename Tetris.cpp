@@ -6,7 +6,6 @@
 #include <cstdlib>
 #include <ctime>
 #include <vector>
-#include <map>
 
 using namespace std;
 
@@ -476,7 +475,7 @@ void reset(){
 void keyboard(unsigned char key, int x, int y) {
     switch ( key ) {
         case 'r':
-            cout<<"\n\n\RESTART\n\n\n";
+            cout<<"\n\nRESTART\n\n\n";
             reset();
             break;
         case 'q':
