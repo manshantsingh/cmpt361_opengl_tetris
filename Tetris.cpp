@@ -18,7 +18,7 @@ const int NUM_GRID_LINE_POINTS = 4 + 2*NUM_ROWS + 2*NUM_COLS;
 const float diffX = 2.0/(NUM_COLS+1), diffY=2.0/(NUM_ROWS+1); // this should give half a cell border
 const float cornerX = diffX*5, cornerY = diffY*10;
 
-const float UPDATE_INTERVAL = 10.0;
+const float UPDATE_INTERVAL = 50.0;
 const int REGULAR_GRAVITY_FACTOR = 5;
 
 const int NUM_COLORS = 6;
@@ -31,7 +31,12 @@ vec3 SHAPE_COLORS[NUM_COLORS] = {
     vec3(1.0, 0.0, 1.0)
 };
 
+// shader program
+GLuint program;
+// shader variables
+GLuint vPosition, vColor;
 
+// grid lines VAO
 GLuint grid_vao;
 
 vector<vec2> ground_points;
@@ -322,17 +327,10 @@ void init_grid_lines() {
     // glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(points), points);
     glBufferSubData(GL_ARRAY_BUFFER, sizeof(grid), sizeof(gridColors), gridColors);
 
-    // Load shaders and use the resulting shader program
-    GLuint program = InitShader( "vshader.glsl", "fshader.glsl" );
-    glUseProgram( program );
-
-    // Initialize the vertex position attribute from the vertex shader
-    GLuint loc = glGetAttribLocation( program, "vPosition" );
-    glEnableVertexAttribArray( loc );
-    glVertexAttribPointer( loc, 2, GL_FLOAT, GL_FALSE, 0,
+    glEnableVertexAttribArray( vPosition );
+    glVertexAttribPointer( vPosition, 2, GL_FLOAT, GL_FALSE, 0,
                            BUFFER_OFFSET(0) );
 
-    GLuint vColor = glGetAttribLocation( program, "vColor" );
     glEnableVertexAttribArray( vColor );
     glVertexAttribPointer( vColor, 3, GL_FLOAT, GL_FALSE, 0,
                            BUFFER_OFFSET(sizeof(grid)) );
@@ -353,30 +351,6 @@ void init() {
 
     glClearColor( 0.0, 0.0, 0.0, 1.0 ); // black background
 }
-
-// void update_ground() {
-//     glGenVertexArrays( 1, &ground_vao );
-//     glBindVertexArray( ground_vao );
-
-//     GLuint buffer;
-//     glGenBuffers( 1, &buffer );
-//     glBindBuffer( GL_ARRAY_BUFFER, buffer );
-
-//     glBufferData( GL_ARRAY_BUFFER, vecSize(ground_points) + vecSize(ground_colors), &ground_points[0], GL_STATIC_DRAW );
-//     glBufferSubData( GL_ARRAY_BUFFER, vecSize(ground_points), vecSize(ground_colors), &ground_colors[0] );
-
-//     GLuint program = InitShader( "vshader.glsl", "fshader.glsl" );
-//     glUseProgram( program );
-
-//     GLuint loc = glGetAttribLocation( program, "vPosition" );
-//     glEnableVertexAttribArray( loc );
-//     glVertexAttribPointer( loc, 2, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0) );
-
-//     GLuint vColor = glGetAttribLocation( program, "vColor" );
-//     glEnableVertexAttribArray( vColor );
-//     glVertexAttribPointer( vColor, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(vecSize(ground_points)) );
-// }
-
 //----------------------------------------------------------------------------
 
 void display_curr() {
@@ -395,14 +369,9 @@ void display_curr() {
     glBufferData( GL_ARRAY_BUFFER, vecSize(points) + vecSize(colors), &points[0], GL_STATIC_DRAW );
     glBufferSubData( GL_ARRAY_BUFFER, vecSize(points), vecSize(colors), &colors[0] );
 
-    GLuint program = InitShader( "vshader.glsl", "fshader.glsl" );
-    glUseProgram( program );
+    glEnableVertexAttribArray( vPosition );
+    glVertexAttribPointer( vPosition, 2, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0) );
 
-    GLuint loc = glGetAttribLocation( program, "vPosition" );
-    glEnableVertexAttribArray( loc );
-    glVertexAttribPointer( loc, 2, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0) );
-
-    GLuint vColor = glGetAttribLocation( program, "vColor" );
     glEnableVertexAttribArray( vColor );
     glVertexAttribPointer( vColor, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(vecSize(points)) );
 
@@ -421,14 +390,9 @@ void display_ground() {
     glBufferData( GL_ARRAY_BUFFER, vecSize(ground_points) + vecSize(ground_colors), &ground_points[0], GL_STATIC_DRAW );
     glBufferSubData( GL_ARRAY_BUFFER, vecSize(ground_points), vecSize(ground_colors), &ground_colors[0] );
 
-    GLuint program = InitShader( "vshader.glsl", "fshader.glsl" );
-    glUseProgram( program );
+    glEnableVertexAttribArray( vPosition );
+    glVertexAttribPointer( vPosition, 2, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0) );
 
-    GLuint loc = glGetAttribLocation( program, "vPosition" );
-    glEnableVertexAttribArray( loc );
-    glVertexAttribPointer( loc, 2, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0) );
-
-    GLuint vColor = glGetAttribLocation( program, "vColor" );
     glEnableVertexAttribArray( vColor );
     glVertexAttribPointer( vColor, 3, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(vecSize(ground_points)) );
 
@@ -536,6 +500,13 @@ int main(int argc, char **argv) {
     // Iff you get a segmentation error at line 34, please uncomment the line below
     glewExperimental = GL_TRUE; 
     glewInit();
+
+    // Load shaders and use the resulting shader program
+    program = InitShader( "vshader.glsl", "fshader.glsl" );
+    glUseProgram( program );
+    // Load shader variables
+    vPosition = glGetAttribLocation( program, "vPosition" );
+    vColor = glGetAttribLocation( program, "vColor" );
 
     init();
     init_grid_lines();
