@@ -122,7 +122,6 @@ public:
     }
 
     bool moveDown(){
-        cout<<"pos: "<<_center.x<<' '<<_center.y<<endl;
         _center.y--;
         if(hasCollision()){
             _center.y++;
@@ -135,7 +134,6 @@ public:
         auto pos = getPos();
         for(auto& v: pos){
             if(v.x<0 || v.x>=NUM_COLS || v.y<0 || v.y>=NUM_ROWS || cell_colors[v.y][v.x]!=nullptr){
-                cout<<"collided at: "<<v.x<<", "<<v.y<<endl;
                 return true;
             }
         }
@@ -240,15 +238,14 @@ void recomputePoints(){
 //----------------------------------------------------------------------------
 
 void setNewCurr(){
-    cout<<"gets here\n";
     if(curr != nullptr){
         auto pos=curr->getPos();
         auto* color=curr->getColor();
         for(auto& v: pos){
             if(v.x<0||v.y<0) {
-                // TODO
+                cout<<"should not get here\n";
                 cout<<v.x<<" while limit: "<<NUM_COLS<<"\n"<<v.y<<" while limit: "<<NUM_ROWS<<endl<<endl;
-                // continue;
+                continue;
             }
             cell_colors[v.y][v.x]=color;
         }
@@ -268,21 +265,18 @@ void setNewCurr(){
             }
             else it++;
         }
-        cout<<"Some Row Completed: "<<(somethingChanged?"true":"false")<<endl;
         if(somethingChanged){
             for(int i=cell_colors.size();i<NUM_ROWS;i++) cell_colors.emplace_back(NUM_COLS, nullptr);
             recomputePoints();
         }
         else appendPoints(pos, ground_points, *color, ground_colors);
-        cout<<"color: "<<*color<<endl;
-        cout<<"points size: "<<ground_points.size()<<endl;
         delete curr;
     }
     curr = new Shape(shapes[rand()%NUM_SHAPES]);
     curr->setColor(&SHAPE_COLORS[rand()%NUM_COLORS]);
     if(curr->hasCollision()){
         gameOver=true;
-        cout<<"You lost"<<endl;
+        cout<<"\n\nYOU LOST\n\n";
     }
 }
 
@@ -399,11 +393,6 @@ void display_curr() {
     vector<vec3> colors;
     appendPoints(curr->getPos(), points, *curr->getColor(), colors);
 
-    // for(auto& x: points) cout<<x<<endl; cout<<endl;
-    // for(auto& x: colors) cout<<x<<endl; cout<<endl;
-
-    // cout<<"cc: "<<*curr->getColor()<<endl;
-
     glBufferData( GL_ARRAY_BUFFER, vecSize(points) + vecSize(colors), &points[0], GL_STATIC_DRAW );
     glBufferSubData( GL_ARRAY_BUFFER, vecSize(points), vecSize(colors), &colors[0] );
 
@@ -502,21 +491,17 @@ void keyboardSpecial( int key, int x, int y )
         case GLUT_KEY_DOWN:
             if(!downPressed){
                 downPressed=true;
-                cout<<"going down special\n";
             }
             break;
         case GLUT_KEY_UP:
-            cout<<"up pressed"<<endl;
             curr->rotate();
             glutPostRedisplay();
             break;
         case GLUT_KEY_LEFT:
-            cout<<"left pressed"<<endl;
             curr->moveHorizontal(false);
             glutPostRedisplay();
             break;
         case GLUT_KEY_RIGHT:
-            cout<<"right pressed"<<endl;
             curr->moveHorizontal(true);
             glutPostRedisplay();
             break;
@@ -529,7 +514,6 @@ void keyboardSpecialUp( int key, int x, int y )
         case GLUT_KEY_DOWN:
             if(downPressed){
                 downPressed=false;
-                cout<<"keyboardUp special"<<endl;
             }
             break;
     }
