@@ -19,7 +19,8 @@ const int NUM_GRID_LINE_POINTS = 4 + 2*NUM_ROWS + 2*NUM_COLS;
 const float diffX = 2.0/(NUM_COLS+1), diffY=2.0/(NUM_ROWS+1); // this should give half a cell border
 const float cornerX = diffX*5, cornerY = diffY*10;
 
-const float gravity_time = 100.0;
+const float UPDATE_INTERVAL = 10.0;
+const int REGULAR_GRAVITY_FACTOR = 5;
 
 const int NUM_COLORS = 6;
 vec3 SHAPE_COLORS[NUM_COLORS] = {
@@ -30,6 +31,17 @@ vec3 SHAPE_COLORS[NUM_COLORS] = {
     vec3(0.0, 1.0, 1.0),
     vec3(1.0, 0.0, 1.0)
 };
+
+
+GLuint grid_vao;
+
+vector<vec2> ground_points;
+vector<vec3> ground_colors;
+vector<vector<vec3*>> cell_colors;
+
+bool downPressed = false;
+bool gameOver = false;
+int updateCounter = 0;
 
 //----------------------------------------------------------------------------
 
@@ -49,6 +61,8 @@ public:
 
     void rotate() {
         if(_rmode == NONE) return;
+        vector<coord> backup_pos = _pos; 
+        coord backup_center=_center;
 
         if(_straight) {
             for(coord& v: _pos) {
@@ -62,6 +76,26 @@ public:
         }
             
         if(_rmode == SEMI) _straight = !_straight;
+
+        // check rotation moved out of bounds
+        int minX=NUM_COLS-1, minY=NUM_ROWS-1, maxX=0, maxY=0;
+        for(auto v: getPos()){
+            minX = min(v.x, minX);
+            minY = min(v.y, minY);
+            maxX = max(v.x, maxX);
+            maxY = max(v.y, maxY);
+        }
+
+        if(minX<0) _center.x-=minX;
+        else if(maxX>=NUM_COLS) _center.x -= NUM_COLS - maxX - 1;
+        if(minY<0) _center.y-=minY;
+        else if(maxY>=NUM_ROWS) _center.y -= NUM_ROWS - maxY - 1;
+
+        if(hasCollision()){
+            _pos = backup_pos;
+            _center = backup_center;
+            if(_rmode == SEMI) _straight = !_straight;
+        }
     }
 
     vector<coord> getPos(){
@@ -80,10 +114,32 @@ public:
         _color = val;
     }
 
-    bool moveAndTestOutOfScreen(){
-        // move(_GRAVITY);
+    void moveHorizontal(bool right){
+        _center.x += right ? 1 : -1;
+        if(hasCollision()){
+            _center.x -= right ? 1 : -1;
+        }
+    }
+
+    bool moveDown(){
+        cout<<"pos: "<<_center.x<<' '<<_center.y<<endl;
         _center.y--;
-        return _center.y <= 0;
+        if(hasCollision()){
+            _center.y++;
+            return true;
+        }
+        return false;
+    }
+
+    bool hasCollision(){
+        auto pos = getPos();
+        for(auto& v: pos){
+            if(v.x<0 || v.x>=NUM_COLS || v.y<0 || v.y>=NUM_ROWS || cell_colors[v.y][v.x]!=nullptr){
+                cout<<"collided at: "<<v.x<<", "<<v.y<<endl;
+                return true;
+            }
+        }
+        return false;
     }
 private:
     static coord _START_POS;
@@ -96,10 +152,7 @@ private:
 };
 coord Shape::_START_POS = coord(NUM_COLS/2, NUM_ROWS-1);
 
-template<typename T>
-int vecSize(const vector<T>& v){
-    return v.size() * sizeof(T);
-}
+Shape* curr;
 
 const int NUM_SHAPES = 7;
 Shape shapes[NUM_SHAPES] = {
@@ -119,16 +172,10 @@ Shape shapes[NUM_SHAPES] = {
     Shape({ coord(-1, 0), coord(0, 0), coord(1, 0), coord(0, -1) }, FULL)
 };
 
-Shape* curr;
-
-
-GLuint grid_vao;
-
-vector<vec2> ground_points;
-vector<vec3> ground_colors;
-
-vector<vector<vec3*>> cell_colors;
-
+template<typename T>
+int vecSize(const vector<T>& v){
+    return v.size() * sizeof(T);
+}
 
 void appendPoints(const vector<coord>& pos, vector<vec2>& points, vec3 color, vector<vec3>& colors){
     for(coord v: pos){
@@ -189,7 +236,59 @@ void recomputePoints(){
     }
 }
 
-void init_grid() {
+
+//----------------------------------------------------------------------------
+
+void setNewCurr(){
+    cout<<"gets here\n";
+    if(curr != nullptr){
+        auto pos=curr->getPos();
+        auto* color=curr->getColor();
+        for(auto& v: pos){
+            if(v.x<0||v.y<0) {
+                // TODO
+                cout<<v.x<<" while limit: "<<NUM_COLS<<"\n"<<v.y<<" while limit: "<<NUM_ROWS<<endl<<endl;
+                // continue;
+            }
+            cell_colors[v.y][v.x]=color;
+        }
+        auto it=cell_colors.begin();
+        bool somethingChanged=false;
+        while(it!=cell_colors.end()){
+            bool rowFull=true;
+            for(auto x: *it){
+                if(x==nullptr){
+                    rowFull=false;
+                    break;
+                }
+            }
+            if(rowFull){
+                somethingChanged=true;
+                it = cell_colors.erase(it);
+            }
+            else it++;
+        }
+        cout<<"Some Row Completed: "<<(somethingChanged?"true":"false")<<endl;
+        if(somethingChanged){
+            for(int i=cell_colors.size();i<NUM_ROWS;i++) cell_colors.emplace_back(NUM_COLS, nullptr);
+            recomputePoints();
+        }
+        else appendPoints(pos, ground_points, *color, ground_colors);
+        cout<<"color: "<<*color<<endl;
+        cout<<"points size: "<<ground_points.size()<<endl;
+        delete curr;
+    }
+    curr = new Shape(shapes[rand()%NUM_SHAPES]);
+    curr->setColor(&SHAPE_COLORS[rand()%NUM_COLORS]);
+    if(curr->hasCollision()){
+        gameOver=true;
+        cout<<"You lost"<<endl;
+    }
+}
+
+//----------------------------------------------------------------------------
+
+void init_grid_lines() {
     glGenVertexArrays( 1, &grid_vao );
     glBindVertexArray( grid_vao );
 
@@ -249,9 +348,17 @@ void init_grid() {
 //----------------------------------------------------------------------------
 
 void init() {
-    init_grid();
+    ground_points.clear();
+    ground_colors.clear();
+    cell_colors = vector<vector<vec3*>>(NUM_ROWS, vector<vec3*>(NUM_COLS, nullptr));
 
-    glClearColor( 0.0, 0.0, 0.0, 1.0 ); // white background
+    curr = nullptr;
+    gameOver = false;
+    updateCounter = 0;
+    setNewCurr();
+    srand(time(nullptr));
+
+    glClearColor( 0.0, 0.0, 0.0, 1.0 ); // black background
 }
 
 // void update_ground() {
@@ -352,14 +459,37 @@ void display() {
     glFlush();
 }
 
+void gravity(){
+    if(curr == nullptr || curr->moveDown()){
+        setNewCurr();
+    }
+}
+
+void update(int){
+    if(downPressed || ++updateCounter > REGULAR_GRAVITY_FACTOR) {
+        updateCounter = 0;
+        gravity();
+        glutPostRedisplay();
+
+        if(gameOver) return; 
+    }
+
+    glutTimerFunc(UPDATE_INTERVAL, update, 0);
+}
+
+void reset(){
+    init();
+    glutPostRedisplay();
+    glutTimerFunc(UPDATE_INTERVAL, update, 0);
+}
+
 //----------------------------------------------------------------------------
-bool downPressed=false;
 void keyboard(unsigned char key, int x, int y) {
     switch ( key ) {
         case 'r':
-            cout<<"\n\n\nMISSING RESTART\n\n\n"; 
+            cout<<"\n\n\RESTART\n\n\n";
+            reset();
             break;
-        case 033:
         case 'q':
             exit( EXIT_SUCCESS );
             break;
@@ -380,6 +510,16 @@ void keyboardSpecial( int key, int x, int y )
             curr->rotate();
             glutPostRedisplay();
             break;
+        case GLUT_KEY_LEFT:
+            cout<<"left pressed"<<endl;
+            curr->moveHorizontal(false);
+            glutPostRedisplay();
+            break;
+        case GLUT_KEY_RIGHT:
+            cout<<"right pressed"<<endl;
+            curr->moveHorizontal(true);
+            glutPostRedisplay();
+            break;
     }
 }
 
@@ -397,65 +537,7 @@ void keyboardSpecialUp( int key, int x, int y )
 
 //----------------------------------------------------------------------------
 
-void setNewCurr(){
-    cout<<"gets here\n";
-    if(curr != nullptr){
-        auto pos=curr->getPos();
-        auto* color=curr->getColor();
-        for(auto& v: pos){
-            if(v.x<0||v.y<0) {
-                // TODO
-                cout<<v.x<<" while limit: "<<NUM_COLS<<"\n"<<v.y<<" while limit: "<<NUM_ROWS<<endl<<endl;
-                continue;
-            }
-            cell_colors[v.y][v.x]=color;
-        }
-        auto it=cell_colors.begin();
-        bool somethingChanged=false;
-        while(it!=cell_colors.end()){
-            bool rowFull=true;
-            for(auto x: *it){
-                if(x==nullptr){
-                    rowFull=false;
-                    break;
-                }
-            }
-            if(rowFull){
-                somethingChanged=true;
-                it = cell_colors.erase(it);
-            }
-            else it++;
-        }
-        cout<<"somethingChanged: "<<(somethingChanged?"true":"false")<<endl;
-        if(somethingChanged){
-            for(int i=cell_colors.size();i<NUM_ROWS;i++) cell_colors.emplace_back(NUM_COLS, nullptr);
-            recomputePoints();
-        }
-        else appendPoints(pos, ground_points, *color, ground_colors);
-        cout<<"color: "<<*color<<endl;
-        cout<<"points size: "<<ground_points.size()<<endl;
-        delete curr;
-    }
-    curr = new Shape(shapes[rand()%NUM_SHAPES]);
-    curr->setColor(&SHAPE_COLORS[rand()%NUM_COLORS]);
-}
-
-void gravity(int){
-    if(curr == nullptr || curr->moveAndTestOutOfScreen()){
-        setNewCurr();
-    }
-
-    glutPostRedisplay();
-    glutTimerFunc(gravity_time, gravity, 0);
-}
-
-//----------------------------------------------------------------------------
-
 int main(int argc, char **argv) {
-    cell_colors = vector<vector<vec3*>>(NUM_ROWS, vector<vec3*>(NUM_COLS, nullptr));
-    curr = nullptr;
-    setNewCurr();
-    srand(time(nullptr));
 
     glutInit( &argc, argv );
     glutInitDisplayMode( GLUT_RGBA );
@@ -473,6 +555,7 @@ int main(int argc, char **argv) {
     glewInit();
 
     init();
+    init_grid_lines();
 
     glutDisplayFunc( display );
 
@@ -483,7 +566,7 @@ int main(int argc, char **argv) {
 
     glutIgnoreKeyRepeat(true);
 
-    glutTimerFunc(gravity_time, gravity, 0);
+    glutTimerFunc(UPDATE_INTERVAL, update, 0);
 
     glutMainLoop();
     return 0;
